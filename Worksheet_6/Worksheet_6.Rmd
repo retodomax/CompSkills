@@ -14,12 +14,12 @@ output:  html_document   #############################################
 
 I will use a bootstrap approach. The function `stat` samples some of the rows from the data matrix, fits two models (GAM and logistic function) and calculates the $RMSE$ based on the out of sample points.
 
-```{r}
+```{r, message=FALSE}
 set.seed(1)
 library(tidyverse)
 library(mgcv)
 library(boot)
-data <- read.table("frequency.dat")
+data <- read.table("../frequency.dat")
 names(data) <- c("year", "freq")
 
 stat <- function(data, index){
@@ -52,8 +52,9 @@ myboot <- boot(data = data, statistic = stat, R = 100)
 We see that the logistic function has a lower $RMSE$, however the fitting process does not always converge. This calculation already takes some time. The function `boot` of package `boot` has a built in option to run the computation in parallel. Let's see if this speeds up our calculation
 
 ```{r}
+library(microbenchmark)
 microbenchmark(
-  boot_with_parallel = boot(data = data, statistic = stat, R = 10, parallel = c("snow")),
+  boot_with_parallel = boot(data = data, statistic = stat, R = 10, parallel = c("multicore")),
   boot_without_parallel = boot(data = data, statistic = stat, R = 10, parallel = c("no"))
   )
 ```
@@ -61,7 +62,7 @@ microbenchmark(
 The calculation seems not to be faster. However, we used a very small value for R. With larger values this might change. We finally compare the two methodes with a larger number of replications, which takes a long time to compute.
 
 ```{r}
-myboot <- boot(data = data, statistic = stat, R = 2000, parallel = c("snow"))
+myboot <- boot(data = data, statistic = stat, R = 2000, parallel = c("multicore"))
 (rmse_mean <- apply(myboot$t, 2, mean, na.rm = T))
 ```
 
