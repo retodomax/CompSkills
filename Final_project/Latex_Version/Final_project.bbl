@@ -1,0 +1,15 @@
+\begin{thebibliography}{1}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Wood(2019)]{R-mgcv}
+Simon Wood.
+\newblock \emph{mgcv: Mixed GAM Computation Vehicle with Automatic Smoothness
+  Estimation}, 2019.
+\newblock URL \url{https://CRAN.R-project.org/package=mgcv}.
+\newblock R package version 1.8-29.
+
+\end{thebibliography}

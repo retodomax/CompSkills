@@ -1,0 +1,71 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\title{Latex document}
+\author{Reto Zihlmann}
+\date{November 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Model fitting and prediction}
+
+\subsection{Statistical Model}
+
+
+The statistical model I use is a GAM which stand for generalized additive model. The model can be written as
+
+$$
+g(E(Y)) = \beta_0 + f_1(x_1) + f_2(x_2) + \dots + f_m(x_m)
+$$
+
+\subsection{Properties}
+
+There are two properties we might know from other models
+
+\begin{itemize}
+	\item[] \textbf{Generalized} The $g(\cdot)$ is the link function we know from generalised linear models
+	\item[] \textbf{Additive} The predictor is a linear combination of smooth functions $f_x()$ The smooth function makes GAM more general than generalized linear models but they do not allow automatically for interactions (no curse of dimensionality).
+\end{itemize}
+
+\subsection{Frequency Data}
+
+Applying the model to the frequency data leads to
+
+$$
+E(\log(Frequency)) = \beta_0 + f_{time}(time)
+$$
+
+which means our $g(\cdot)$ is the identity function and we have only one smooth spline function for our predictor $time$. 
+
+\subsection{Fitting}
+
+The model is fitted in R with the following comands
+
+<<>>=
+data <- read.table("frequency.dat")
+names(data) <- c("year", "freq")
+library(mgcv)
+fit <- gam(log(freq) ~ s(year), data = data)
+@
+
+\subsection{Prediction}
+
+We can plot the fitted values and compare them to the observed values
+
+<<>>=
+plot(log(freq) ~ year, data = data, ylab = "Freqency [MHz]")
+lines(data$year,predict(fit), col = "red", lwd = 2)
+@
+
+The summary function shows that the effect of year on Frequency is highly significant. The smoothing parameter is determined via cross validation. The smoothed line has 5.26 estimated degrees of freedom which is more than a simple linear regression.
+
+<<>>=
+summary(fit)
+@
+
+
+
+
+\end{document}

@@ -1,0 +1,93 @@
+---
+project: CompSkills    #################################################
+title:   Worksheet 3
+author:  Reto Zihlmann
+date:    2019-10-22 19:11:18
+output:  html_document   #############################################
+---
+
+## Problem 4
+
+```{r}
+library(mgcv)
+data <- read.table("frequency.dat")
+names(data) <- c("year", "freq")
+```
+
+
+
+
+### (a)
+
+```{r}
+fit_and_predict <- function(data,
+                  time_span_fit = c(1971, 2000),
+                  time_span_pred = c(time_span_fit[2], 2019)){
+  fit_data <- data[data$year >= time_span_fit[1] & data$year <= time_span_fit[2], ]
+  fit <- gam(log(freq) ~ s(year), data = fit_data)
+  pred_data <- data[data$year >= time_span_pred[1] & data$year <= time_span_pred[2], ]
+  pred_values <- predict.gam(fit, newdata = list(year = pred_data$year), se.fit = T)
+  out <- list(fitted_values = data.frame(year = fit_data$year,
+                                         freq = fit$fitted.values,
+                                         obs = log(fit_data$freq)),
+              residual = fit$residuals,
+              predictions = data.frame(year = pred_data$year,
+                                       freq = pred_values$fit,
+                                       obs = log(pred_data$freq)),
+              prediction_errors = pred_values$se.fit)
+  return(out)
+}
+```
+
+
+### (b)
+
+```{r}
+visualize_prediction <- function(input,
+                                 ...){
+  lower_ci <- input$predictions$freq - 1.96*input$prediction_errors
+  upper_ci <- input$predictions$freq + 1.96*input$prediction_errors
+  min_max <- function(x){
+    c(min(x),max(x))
+  }
+  xrange <- min_max(c(input$fitted_values$year,
+                      input$predictions$year))
+  yrange <- min_max(c(input$fitted_values$freq,
+                      input$fitted_values$obs,
+                      input$predictions$freq,
+                      input$predictions$obs,
+                      lower_ci, upper_ci))
+  plot(input$fitted_values$year,
+       input$fitted_values$obs,
+       xlim = xrange,
+       ylim = yrange,...)
+  lines(input$fitted_values$year,
+        input$fitted_values$freq,
+        col = "darkblue", lwd = 2)
+  polygon(x = c(input$predictions$year, rev(input$predictions$year)),
+          y = c(lower_ci,
+                rev(upper_ci)),
+          border = NA, col = "lightgray")
+  lines(input$predictions$year, input$predictions$freq, col = "gray", lwd = 2)
+  points(input$predictions$year, input$predictions$obs, col = rgb(0,0,0, alpha = 0.3))
+}
+```
+
+
+### Test
+
+```{r}
+mypred <- fit_and_predict(data = data,
+                          time_span_fit = c(1960, 2000))
+visualize_prediction(mypred, xlab = "year", ylab = "log(freq)")
+
+mypred <- fit_and_predict(data = data,
+                          time_span_fit = c(1960, 2005))
+visualize_prediction(mypred, xlab = "year", ylab = "log(freq)", pch = 16)
+
+mypred <- fit_and_predict(data = data,
+                          time_span_fit = c(1960, 2010))
+visualize_prediction(mypred, xlab = "year", ylab = "log(freq)", pch = 16, col = "darkblue")
+```
+
+

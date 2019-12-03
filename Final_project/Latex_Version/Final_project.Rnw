@@ -1,0 +1,305 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage[round]{natbib}
+\bibliographystyle{unsrtnat}
+
+% \usepackage[backend=bibtex, style=authoryear-icompm, natbib=true]{biblatex}
+% \addbibresource{bib-packages.bib}
+
+% \bibliographystyle{plainnat}
+% \usepackage{natbib}
+% \addbibresource{bib_packages.bib}
+% \addbibresource{bib-packages.bib}
+\DeclareMathOperator*{\argmin}{argmin}
+
+
+
+\begin{document}
+
+
+<<setup, include = F>>=
+knitr::opts_chunk$set(comment = "",
+                      tidy = TRUE,
+                      tidy.opts = list(blank = FALSE, width.cutoff = 45),
+                      fig.align = "left",
+                      out.width = "100%",
+                      fig.height = 5,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE)
+@
+
+
+<<package-bib, include=FALSE>>=
+# automatically create a bib database for R packages
+knitr::write_bib(c(
+  .packages(), 'bookdown', 'knitr', 'rmarkdown', "mgcv"
+), 'bib-packages.bib')
+@
+
+
+
+\section{Introduction}
+
+In this project the \href{https://github.com/karlrupp/microprocessor-trend-data/tree/master/42yrs}{frequency dataset} is analysed. The frequency dataset consists of 90 observations of microprocessor frequencies between 1971 and 2018 (Figure \ref{fig:plot1}).
+
+\begin{figure}
+<<plot1>>=
+data <- read.table("../../frequency.dat")
+names(data) <- c("year", "freq")
+plot(freq ~ year, data = data, ylab = "Freqency [MHz]",
+     ylim = c(-1000, 6000))
+@
+\caption{Microprocessor frequencies between 1971 and 2018.}
+\label{fig:plot1}
+\end{figure}
+
+
+A first inspection of the data shows relatively low frequencies in the beginning with a sudden increase arround the year 1995. The fastest increase we see arround the year 2002, afterwards the frequency starts leveling off. This pattern is characteristic for logistic functions, which might be useful to model the data.
+
+The variability increases with the level of frequency (heteroscedasticity) and all frequencies are naturally positive. Therefore, a log transformation might be useful to stabilize the variance.
+
+
+\begin{figure}
+<<plot2>>=
+plot(log(freq) ~ year, data = data, ylab = "log(Freqency)")
+@
+\caption{Microprocessor frequencies between 1971 and 2018 on log scale.}
+\label{fig:plot2}
+\end{figure}
+
+
+The log transformed frequencies have a relatively stable variance over all years (Figure \ref{fig:plot2}). There is a clear increase in log frequency until the year 2005. Afterwards the log frequency seems to be relatively stable. A piecewise linear function might be a good choice to model these data.
+
+
+\section{Model fitting and prediction}
+
+\subsection{Model}
+
+Closesly related to piecewise linear functions are regression splines. Splines are picewise polynomials which are continuously differentiable up to a certain degree at the nodes. Splines can easliy be fitted with a generalized additive model (GAM). The model can be written as
+
+\begin{equation}
+g(E(Y)) = \beta_0 + f_1(x_1) + f_2(x_2) + \dots + f_m(x_m)
+\end{equation}
+
+where $g(\cdot)$ is a link function, linking the expected value of $Y$ to the linear predictor and $f_i(\cdot)$ are smooth functions of the predictor $x_i$. The predictor is a linear combination of smooth functions $f_i(\cdot)$. The smooth function makes GAM more general than generalized linear models but they do not allow automatically for interactions (no curse of dimensionality). In our case we use splines as smooth functions.
+
+The degrees of freedom of the spline have to be limited to avoid overfitting. This is done by penalizing the wiggliness of the spline in the loss function
+
+\begin{equation}
+\hat{f} = \argmin_{f \in F} \sum_{i=1}^n(y_i - f(x_i))^2 + \lambda \int_{a}^bg''(x)^2 dx
+\end{equation}
+
+where $F$ is the class of possible spline functions, $\lambda$ is the penalty parameter, $a$ and $b$ are the lower and upper boundary of the range of $x$, respectively. The implementation of GAM in R with the function `gam()`, automatically chooses the penalty parameter with cross validation.
+
+Applying the model to the frequency data leads to
+
+\begin{equation}
+E(\log(Frequency)) = \beta_0 + f_{t}(t)
+\end{equation}
+
+which means our $g(\cdot)$ is the identity function and we have only one smooth spline function for our predictor time $t$.
+
+
+\subsection{Fitting}
+
+We fit a GAM to the data using the function \texttt{gam()} of the package \texttt{mgcv} \citep{R-mgcv}.
+
+<<message=FALSE>>=
+# packages ----------------------------------------------------------------
+library(mgcv)
+@
+
+\begin{figure}
+<<plot3>>=
+fit <- gam(log(freq) ~ s(year), data = data)
+plot(log(freq) ~ year, data = data, ylab = "log(freqency)")
+lines(data$year,predict(fit), col = "red", lwd = 2)
+@
+\caption{Fitted GAM model.}
+\label{fig:plot3}
+\end{figure}
+
+
+GAM is able to follow the trend without overfitting to the single observations (Figure \ref{fig:plot3}).
+
+
+
+<<>>=
+summary(fit)
+@
+
+
+The predictor year is highly significant with \Sexpr{format(summary(fit)$edf, digits = 4)} estimated degrees of freedom.
+
+
+\subsection{Validation}
+
+The Tukey-Anscombe plot and the QQ plot of the model fit shows that the model assumptions are largely fulfilled (Figure \ref{fig:plot4}). The variance stays constant over the entire range of fitted value and the residuals follow a normal distribution.
+
+\begin{figure}
+<<plot4>>=
+par(mfrow = c(1,2))
+with(fit, plot(fitted.values, residuals))
+qq.gam(fit)
+@
+\caption{Residual analysis of the fitted GAM model with Tukey-anscombe plot (left) and QQ plot (right).}
+\label{fig:plot4}
+\end{figure}
+
+
+
+\subsection{Extrapolation}
+
+GAM can also be used to predict future frequencies (Figure \ref{fig:plot5}).
+
+
+\begin{figure}
+<<plot5>>=
+plot(log(freq) ~ year, data = data, ylab = "Freqency [MHz]", xlim = c(1970, 2050), ylim = c(0,10))
+lines(data$year,predict(fit), col = "red", lwd = 2)
+pred_period <- 2018:2050
+mypred <- predict.gam(fit, newdata = list(year = pred_period), se.fit = T)
+polygon(x = c(pred_period, rev(pred_period)),
+        y = c(mypred$fit - 1.96*mypred$se.fit,
+              rev(mypred$fit + 1.96*mypred$se.fit)),
+        border = NA, col = "lightgray")
+lines(pred_period, mypred$fit, col = "gray", lwd = 2)
+@
+\caption{Linear extrapolation of the trend fitted by the GAM model. The gray area indicate the 95\% CI for the trend prediction.}
+\label{fig:plot5}
+\end{figure}
+
+
+
+
+
+\section{Simulation study}
+
+First, I created a true model which can lead to similar data as we observed. I used a logistic model with normally distributed heteroscadistic errors.
+
+\begin{figure}
+<<plot6>>=
+# Single example ----------------------------------------------------------
+plot(freq ~ year, data = data, ylab = "Freqency [MHz]",
+     ylim = c(-1000, 6000))
+
+# Assume a true function
+fpl <- function(x, A = 0, B = 3000, xmid = 2003, scal = 3){
+  A+(B-A)/(1+exp((xmid-x)/scal))
+}
+curve(fpl, from = 1970, to = 2020, add = T)
+
+# sample new points
+set.seed(1)
+true_value <- fpl(data$year)
+value <- abs(true_value + rnorm(length(true_value), mean = 0, sd = true_value/3))
+sim_data <- data.frame(year = data$year, freq = value)
+points(sim_data$year, sim_data$freq, col = 'green')
+legend('topleft', legend = c('Original observations', 'Observations with new model'),
+       pch = 1, col = c('black', 'green'))
+@
+\caption{Random observations using the new model. The black line shows the true mean of the new model.}
+\label{fig:plot6}
+\end{figure}
+
+
+
+Next we fit two models to the new data. One model is a GAM which I already used before, the other is a logistic model fitted with nonlinear least squares.
+
+
+\begin{figure}
+<<plot7>>=
+# fit with GAM
+fit <- gam(log(freq) ~ s(year), data = sim_data)
+
+# fit with SSfpl()
+fit_ssfpl <- nls(freq ~ SSfpl(year, A, B, xmid, scal), data = sim_data)
+
+# plot all
+plot(freq ~ year, data = sim_data, ylab = "Freqency [MHz]",
+     ylim = c(-1000, 6000))
+lines(sim_data$year,exp(predict(fit)), col = "red", lwd = 2)
+lines(sim_data$year, predict(fit_ssfpl), col = 'green', lwd = 2)
+curve(fpl, lwd = 2, add = T)
+legend('topleft', legend = c('True model', 'GAM fit', 'FPL fit'),
+       lwd = 2, col = c('black', 'red', 'green'))
+abline(v = 2008, lty = 2)
+abline(v = 2017, lty = 2)
+@
+\caption{GAM and four paramteric logistic model (FPL model) fitted to a random sample of the new model.}
+\label{fig:plot7}
+\end{figure}
+
+
+To compare how well the two models fit at year 2008 and 2017, we repeat the simulation 1000 times and plot the density of the difference to the true model.
+
+\begin{figure}
+<<plot8, tidy=TRUE, cache=TRUE>>=
+# simulation --------------------------------------------------------------
+
+sim_diff <- function() {
+  true_value <- fpl(data$year)
+  value <- abs(true_value + rnorm(length(true_value), mean = 0, sd = true_value/3))
+  sim_data <- data.frame(year = data$year, freq = value)
+  fit <- gam(log(freq) ~ s(year), data = sim_data)
+  fit_ssfpl <- nls(freq ~ SSfpl(year, A, B, xmid, scal), data = sim_data)
+  gam_pred <- unname(exp(predict(fit, newdata = list(year = c(2008, 2017)))))
+  ssfpl_pred <- predict(fit_ssfpl, newdata = list(year = c(2008, 2017)))
+  true_values <- fpl(c(2008, 2017))
+  c(gam_pred-true_values, ssfpl_pred-true_values)
+}
+
+out <- replicate(1000, sim_diff())
+out <- t(out)
+
+
+# plot simulation results -------------------------------------------------
+
+plot(density(out[,1]), main = 'Difference to true function at 2008',
+     xlim = c(-1000, 1000), ylim = c(0, 0.005),
+     col = 'red', lwd = 2)
+lines(density(out[,3]),
+      col = 'green', lwd = 2)
+abline(v = 0, lty = 2)
+legend('topleft', legend = c('True model', 'GAM fit', 'FPL fit'),
+       lwd = 2, col = c('black', 'red', 'green'))
+@
+\caption{Distribution of the difference between the true model and the estimates of the GAM and FPL model at 2008.}
+\label{fig:plot8}
+\end{figure}
+
+
+\begin{figure}
+<<plot9>>=
+plot(density(out[,2]), main = 'Difference to true function at 2017',
+     xlim = c(-1000, 1000), ylim = c(0, 0.005),
+     col = 'red', lwd = 2)
+lines(density(out[,4]),
+      col = 'green', lwd = 2)
+abline(v = 0, lty = 2)
+legend('topleft', legend = c('True model', 'GAM fit', 'FPL fit'),
+       lwd = 2, col = c('black', 'red', 'green'))
+@
+\caption{Distribution of the difference between the true model and the estimates of the GAM and FPL model at 2017.}
+\label{fig:plot9}
+\end{figure}
+
+
+We see that GAM is negatively biased at 2008. The logistic model has no bias and lower variance at both time points. This is not very surprising because the true underlying model was also a logistic model.
+
+
+\section{Conclusion}
+
+We can conclude that GAM is a powerful tool to fit a curve to data which have some piecewise functional form. In our simulation, the logistic model was slightly better in fitting the true curve. However, the logistic model is much less flexible compared to GAM. Therefore, we recomend GAM as fast and easy to use model which can fit a wide variety of functions.
+
+
+\bibliography{bib-packages}
+
+
+\end{document}
+
+
+

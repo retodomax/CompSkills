@@ -1,0 +1,73 @@
+---
+title: "Worksheet 1"
+author: "Reto Zihlmann"
+date: "24 September 2019"
+output: html_document
+---
+
+# Problem 1
+
+## (b)
+
+$$
+f(x_1, x_2)=10^6x_2^{-6}\exp\left(\frac{-1}{2x_2^2}\left(120 - 6x_1+x_1^2\right)\right)
+$$
+
+
+The equation is similar to the density of the normal distribtution, with $x_2$ representing the variance $\sigma^2$.
+
+The following solution was found with the help of Naim de Viragh.
+
+### (i)
+
+First we define the function as well as the indicater version of the function.
+
+```{r}
+myfun <- function(x1, x2 = 4){
+  10^6 * x2^-6 * exp(-1/(2*x2^2) * (120 - 6*x1 + x1^2))
+}
+
+ind_myfun <- function(x1, x2){
+  as.numeric(myfun(x1, x2) >= 2)
+}
+```
+
+Also we need to set a reasonable range over which we calculate the integral. Outside of this range, the function value is close to zero.
+
+```{r}
+dx <- 0.1
+x1range <- seq(-10, 15, dx)
+x2range <- seq(1, 20, dx)
+```
+
+We can display the region where the indicator function is 1.
+
+```{r}
+val <- outer(x1range, x2range, FUN = ind_myfun)
+image(x = x1range, y = x2range, z = val)
+```
+
+Finally we calculate the integral
+
+```{r}
+sum(val) * dx * dx
+```
+
+
+### (ii)
+
+Again we display the region and the function value over which we integrate
+
+```{r}
+val <- outer(x1range, x2range, FUN = myfun)
+val[val < 2] <- 0
+image(x = x1range, y = x2range, z = val)
+contour(x = x1range, y = x2range, z = val, levels = 2, add = T)
+```
+
+We calculate the integral the same way as in (i)
+
+```{r}
+sum(val) * dx * dx
+```
+

@@ -1,0 +1,55 @@
+---
+title: "shortname"
+author: "Reto Zihlmann"
+date: "5 November 2019"
+output: pdf_document
+---
+
+
+## Problem 3
+
+I downloaded the frequency.dat file from the [repository](https://github.com/karlrupp/microprocessor-trend-data/tree/master/42yrs).
+
+
+```{r}
+data <- read.table("frequency.dat")
+names(data) <- c("year", "freq")
+plot(freq ~ year, data = data, ylab = "Freqency [MHz]")
+```
+
+A first inspection of the data shows that the data show that the variability frequency increases with the level of frequency and all frequencies are naturally positive. Therefore, a log transformation might be useful to stabilize the variance.
+
+```{r}
+plot(log(freq) ~ year, data = data, ylab = "Freqency [MHz]")
+```
+
+We try to fit a GAM to the data.
+
+```{r}
+library(mgcv)
+fit <- gam(log(freq) ~ s(year), data = data)
+plot(log(freq) ~ year, data = data, ylab = "Freqency [MHz]")
+lines(data$year,predict(fit), col = "red", lwd = 2)
+```
+
+GAM is able to follow the trend without overfitting to the single observations.
+
+```{r}
+summary(fit)
+```
+
+The predictor year is highly significant with `r summary(fit)$edf` estimated degrees of freedom. GAM can also be used to predict future frequencies.
+
+```{r}
+plot(log(freq) ~ year, data = data, ylab = "Freqency [MHz]", xlim = c(1970, 2050), ylim = c(0,10))
+lines(data$year,predict(fit), col = "red", lwd = 2)
+pred_period <- 2018:2050
+mypred <- predict.gam(fit, newdata = list(year = pred_period), se.fit = T)
+polygon(x = c(pred_period, rev(pred_period)),
+        y = c(mypred$fit - 1.96*mypred$se.fit,
+              rev(mypred$fit + 1.96*mypred$se.fit)),
+        border = NA, col = "lightgray")
+lines(pred_period, mypred$fit, col = "gray", lwd = 2)
+```
+
+

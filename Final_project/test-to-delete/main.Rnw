@@ -1,0 +1,37 @@
+\documentclass[]{article}
+
+\usepackage[round]{natbib}
+\bibliographystyle{unsrtnat}
+
+%% ##############################
+\begin{document}
+
+Lorem ipsum dolor sit amet \citep{einstein}.
+At vero eos et accusam et justo duo dolores et ea rebum \citet{dirac}.
+\bibliography{sample}. As you can see in Figure \ref{fig:plot1} there are several problems. You can also see in \ref{fig:plot4} a similar process.
+
+
+
+
+
+
+\begin{figure}
+<<plot1>>=
+plot(1:10)
+@
+\caption{Microprocessor frequencies between 1971 and 2018.}
+\label{fig:plot1}
+\end{figure}
+
+
+
+\begin{figure}
+<<plot4>>=
+plot(10:1)
+@
+\caption{Residual analysis of the fitted GAM model with Tukey-anscombe plot (left) and QQ plot (right).}
+\label{fig:plot4}
+\end{figure}
+
+
+\end{document}

@@ -1,0 +1,112 @@
+---
+project: CompSkills    #################################################
+title:   Worksheet 6
+author:  Reto Zihlmann
+date:    2019-12-03 18:15:49
+output:  html_document   #############################################
+---
+
+
+
+## Problem 8
+
+### (a)
+
+I will use a bootstrap approach. The function `stat` samples some of the rows from the data matrix, fits two models (GAM and logistic function) and calculates the $RMSE$ based on the out of sample points.
+
+```{r}
+set.seed(1)
+library(tidyverse)
+library(mgcv)
+library(boot)
+data <- read.table("frequency.dat")
+names(data) <- c("year", "freq")
+
+stat <- function(data, index){
+  tryCatch({
+    train <- data[index,]
+    test <- data[-index,]
+    if(!is_empty(test)){
+      fit_gam <- gam(log(freq) ~ s(year), data = train)
+      fit_ssfpl <- nls(freq ~ SSfpl(year, A, B, xmid, scal), data = train)
+      gam_pred <- unname(exp(predict(fit_gam, newdata = test)))
+      ssfpl_pred <- predict(fit_ssfpl, newdata = test)
+      gam_rmse <- sqrt(mean((test$freq - gam_pred)^2))
+      ssfpl_rmse <- sqrt(mean((test$freq - ssfpl_pred)^2))
+      rmse <- c(gam_rmse, ssfpl_rmse)
+      rmse
+    } else {
+      stop("no points in test set")
+    }
+  }, error = function(err) {return(c(NA, NA))})
+}
+```
+
+Now we run this 100 times.
+
+```{r}
+myboot <- boot(data = data, statistic = stat, R = 100)
+(rmse_mean <- apply(myboot$t, 2, mean, na.rm = T))
+```
+
+We see that the logistic function has a lower $RMSE$, however the fitting process does not always converge. This calculation already takes some time. The function `boot` of package `boot` has a built in option to run the computation in parallel. Let's see if this speeds up our calculation
+
+```{r}
+microbenchmark(
+  boot_with_parallel = boot(data = data, statistic = stat, R = 10, parallel = c("snow")),
+  boot_without_parallel = boot(data = data, statistic = stat, R = 10, parallel = c("no"))
+  )
+```
+
+The calculation seems not to be faster. However, we used a very small value for R. With larger values this might change. We finally compare the two methodes with a larger number of replications, which takes a long time to compute.
+
+```{r}
+myboot <- boot(data = data, statistic = stat, R = 2000, parallel = c("snow"))
+(rmse_mean <- apply(myboot$t, 2, mean, na.rm = T))
+```
+
+
+
+### (b)
+
+The following shell script runs the same calculation as above 4 times with different seeds and saves the $RMSE$ to different `RData` files.
+
+```bash
+#!/bin/sh
+for seed in 1 4 
+do 
+   echo $seed   
+   Rscript -e "set.seed($seed); source('reto_script.R');save(rmse_mean, file='reto_script_$seed.RData')" &
+done
+```
+
+Where `reto_script.R` is the following R script
+
+```r
+library(tidyverse)
+library(mgcv)
+library(boot)
+data <- read.table("frequency.dat")
+names(data) <- c("year", "freq")
+
+stat <- function(data, index){
+  tryCatch({
+    train <- data[index,]
+    test <- data[-index,]
+    if(!is_empty(test)){
+      fit_gam <- gam(log(freq) ~ s(year), data = train)
+      fit_ssfpl <- nls(freq ~ SSfpl(year, A, B, xmid, scal), data = train)
+      gam_pred <- unname(exp(predict(fit_gam, newdata = test)))
+      ssfpl_pred <- predict(fit_ssfpl, newdata = test)
+      gam_rmse <- sqrt(mean((test$freq - gam_pred)^2))
+      ssfpl_rmse <- sqrt(mean((test$freq - ssfpl_pred)^2))
+      rmse <- c(gam_rmse, ssfpl_rmse)
+      rmse
+    } else {
+      stop("no points in test set")
+    }
+  }, error = function(err) {return(c(NA, NA))})
+}
+myboot <- boot(data = data, statistic = stat, R = 2000, parallel = c("snow"))
+(rmse_mean <- apply(myboot$t, 2, mean, na.rm = T))
+```
